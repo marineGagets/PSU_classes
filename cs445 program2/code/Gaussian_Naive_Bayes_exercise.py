@@ -83,14 +83,15 @@ for clas, group in grouped_data:
 # probalistic Model
 # build the variance table from the means for each column and the column variance,
 # where the variance is the square of the standard deviation
-
+print()
 variance_table_data = []
 for clas, group in grouped_data:
     mean = group.mean()
     std_dev = group.std()
-    variance = std_dev ** 2
+    std_dev[std_dev == 0] = 0.0001
+    variance = std_dev ** 2        
     for i, feature_label in enumerate(feature_labels):
-        print("class", clas, "feature", feature_label, "mean", mean[i], "std_dev", std_dev[i], variance[i])
+        print("class: ", clas, "  feature:", feature_label, "  mean:", mean[i], "  std_dev:", std_dev[i], "  variance:", variance[i])
         variance_table_data.append({'Class': clas, 'Feature': feature_label, 'Mean': mean[i], 'Standard Deviation': std_dev[i],\
                                      'Variance': variance[i]})
 variance_table = pd.DataFrame(variance_table_data)
@@ -103,10 +104,95 @@ print("\nVariance Table")
 print()
 print(f"{'                                     class 0':37}{'                         class 1':<25}")
 print(f"{'Feature':<30} {'Spam_mean':<10} {'Spam_variance':<15} {'Not Spam_mean':<13} {'Not Spam_variance':<16}")
-for i in range(57):
-    print(f"{variance_table_class0.iloc[i, 1]:<30}", f"{variance_table_class0.iloc[i, 2]:<10.4f}", \
-          f"{variance_table_class0.iloc[i, 4]:<15.4f}", f"{variance_table_class1.iloc[i, 2]:<13.4f}", \
+row_size = training_data.shape[1] -1
+for i in range(row_size):
+    print(f"{variance_table_class0.iloc[i, 1]:<30}", f"{variance_table_class0.iloc[i, 2]-1:<10.4f}", \
+          f"{variance_table_class0.iloc[i, 4]:<15.4f}", f"{variance_table_class1.iloc[i, 2]-1:<13.4f}", \
           f"{variance_table_class1.iloc[i, 4]:<16.4f}")
+print()
 
-
+# step 3
 # Gaussian Naive Bayes Algorithm `
+
+#calculatethe gaussian probability density function
+
+def gaussian_pdf(x, mean, variance):
+    return (1 / np.sqrt(2 * np.pi * variance)) * np.exp(-((x - mean) ** 2) / (2 * variance))    
+
+def class_probabilites(data, variance_table_class0, variance_table_class1, hypothesis_ratios):
+    # initialize the probabilities
+    probabilities = []
+    for i in range(len(data)):
+        # initialize the probabilities for each class
+        probabilities_class0 = 0
+        probabilities_class1 = 0
+        for j in range(len(data.iloc[i])):
+            # calculate the probabilities for each class    
+            probabilities_class0 += np.log(gaussian_pdf(data.iloc[i, j], variance_table_class0.iloc[j, 2], variance_table_class0.iloc[j, 4]))
+            probabilities_class1 += np.log(gaussian_pdf(data.iloc[i, j], variance_table_class1.iloc[j, 2], variance_table_class1.iloc[j, 4]))
+        # calculate the probabilities for each class
+        probabilities_class0 += np.log(hypothesis_ratios[0])
+        probabilities_class1 += np.log(hypothesis_ratios[1])
+        # append the probabilities for each class
+        probabilities.append([probabilities_class0, probabilities_class1])
+    return probabilities
+
+# calculate the class probabilities for the training data
+probabilities = class_probabilites(training_data, variance_table_class0, variance_table_class1, hypothesis_ratios)
+
+print("Training_data class probabilities")
+print("class 0", "class 1")
+for i in range(10):
+    print(probabilities[i]) 
+print()
+
+  
+# calculate the class probabilities for the test data
+probabilities = class_probabilites(test_data, variance_table_class0, variance_table_class1, hypothesis_ratios)
+print("Test_data class probabilities")
+print("class 0", "class 1")
+for i in range(10):
+    print(probabilities[i])
+
+# calculate the accuracy, precision, and recall of the model on the test_dataand the test_targets
+def accuracy_precision_recall(test_targets, probabilities):
+    # initialize the accuracy, precision, and recall
+    accuracy = 0
+    precision = 0
+    recall = 0
+    for i in range(len(test_targets)):
+        # determine the predicted class
+        predicted_class = 0 if probabilities[i][0] > probabilities[i][1] else 1
+        # determine the actual class
+        actual_class = test_targets.iloc[i]
+        # increment the accuracy, precision, and recall
+        accuracy += 1 if predicted_class == actual_class else 0
+        precision += 1 if predicted_class == 1 and actual_class == 1 else 0
+        recall += 1 if actual_class == 1 else 0
+    # calculate the accuracy, precision, and recall
+    accuracy /= len(test_targets)
+    precision /= recall
+    recall /= len(test_targets)
+    return accuracy, precision, recall  
+
+print()
+print("Accuracy, Precision, Recall")
+print(accuracy_precision_recall(test_targets, probabilities))
+print()  
+
+# generate a confusion matrix for the test data given the test_targets
+def confusion_matrix(test_targets, probabilities):
+    # initialize the confusion matrix
+    confusion_matrix = np.zeros((2, 2))
+    for i in range(len(test_targets)):
+        # determine the predicted class
+        predicted_class = 0 if probabilities[i][0] > probabilities[i][1] else 1
+        # determine the actual class
+        actual_class = test_targets.iloc[i]
+        # increment the confusion matrix
+        confusion_matrix[actual_class][predicted_class] += 1
+    return confusion_matrix
+
+print()
+print("Confusion Matrix")
+print(confusion_matrix(test_targets, probabilities))
