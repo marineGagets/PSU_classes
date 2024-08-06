@@ -86,7 +86,8 @@ for clas, group in grouped_data:
     std_dev = group.std()
     #print(f"\nGroup for target = {clas}")
     #for col in range(len(mean)):
-    #    print(f"Column {col:<10} Mean: {mean[col]:<15.4f} Standard Deviation: {std_dev[col]:<15.4f}")
+    #    print(f"Column {col:<10} Mean: {mean[col]:<15.4f} \
+    # Standard Deviation: {std_dev[col]:<15.4f}")
 
 # probalistic Model
 # build the variance table from the means for each column and the column variance,
@@ -100,9 +101,10 @@ for clas, group in grouped_data:
     variance = std_dev ** 2
     variance[variance == 0.0000] = 0.0001        
     for i, feature_label in enumerate(feature_labels):
-        print(f"class: {clas:<10} feature: {feature_label:<30} mean: {mean[i]:<10.4f} std_dev: {std_dev[i]:<10.4f} \
-               variance: {variance[i]:<10.4f}")
-        variance_table_data.append({'Class': clas, 'Feature': feature_label, 'Mean': mean[i], 'Standard Deviation': std_dev[i],\
+        print(f"class: {clas:<10} feature: {feature_label:<30} mean: {mean[i]:<10.4f} \
+              std_dev: {std_dev[i]:<10.4f} variance: {variance[i]:<10.4f}")
+        variance_table_data.append({'Class': clas, 'Feature': feature_label, \
+                                    'Mean': mean[i], 'Standard Deviation': std_dev[i],\
                                      'Variance': variance[i]})
 variance_table = pd.DataFrame(variance_table_data)
 variance_table_class0 = variance_table[variance_table['Class'] == 0]
@@ -111,12 +113,16 @@ variance_table_class1 = variance_table[variance_table['Class'] == 1]
 #print(np.shape(variance_table)    )
 
 print("\nVariance Table")
-print(f"{'                                     class 0':37}{'                         class 1':<25}")
-print(f"{'Feature':<30} {'Spam_mean':<10} {'Spam_variance':<15} {'Not Spam_mean':<13} {'Not Spam_variance':<16}")
+print(f"{'                                     class 0':37} \
+      {'                         class 1':<25}")
+print(f"{'Feature':<30} {'Spam_mean':<10} {'Spam_variance':<15} {'Not Spam_mean':<13} \
+      {'Not Spam_variance':<16}")
 row_size = training_data.shape[1] -1
 for i in range(row_size):
-    print(f"{variance_table_class0.iloc[i, 1]:<30}", f"{variance_table_class0.iloc[i, 2]-1:<10.4f}", \
-          f"{variance_table_class0.iloc[i, 4]:<15.4f}", f"{variance_table_class1.iloc[i, 2]-1:<13.4f}", \
+    print(f"{variance_table_class0.iloc[i, 1]:<30}", \
+          f"{variance_table_class0.iloc[i, 2]-1:<10.4f}", \
+          f"{variance_table_class0.iloc[i, 4]:<15.4f}", \
+          f"{variance_table_class1.iloc[i, 2]-1:<13.4f}", \
           f"{variance_table_class1.iloc[i, 4]:<16.4f}")
 print()
 
@@ -128,7 +134,8 @@ print()
 def gaussian_pdf(x, mean, variance):
     if variance == 0:
         variance = 0.0001
-    return (1 / np.sqrt(2 * np.pi * variance)) * np.exp(-((x - mean) ** 2) / (2 * variance))
+    return (1 / np.sqrt(2 * np.pi * variance)) * \
+    np.exp(-((x - mean) ** 2) / (2 * variance))
 
 def class_probabilites(data, variance_table_class0, variance_table_class1, hypothesis_ratios):
     # initialize the probabilities
@@ -139,8 +146,10 @@ def class_probabilites(data, variance_table_class0, variance_table_class1, hypot
         probabilities_class1 = 0
         for j in range(len(data.iloc[i])):
             # calculate the probabilities for each class    
-            probabilities_class0 += np.log(gaussian_pdf(data.iloc[i, j], variance_table_class0.iloc[j, 2], variance_table_class0.iloc[j, 4]))
-            probabilities_class1 += np.log(gaussian_pdf(data.iloc[i, j], variance_table_class1.iloc[j, 2], variance_table_class1.iloc[j, 4]))
+            probabilities_class0 += np.log(gaussian_pdf(data.iloc[i, j], \
+                        variance_table_class0.iloc[j, 2], variance_table_class0.iloc[j, 4]))
+            probabilities_class1 += np.log(gaussian_pdf(data.iloc[i, j], \
+                        variance_table_class1.iloc[j, 2], variance_table_class1.iloc[j, 4]))
         # calculate the probabilities for each class
         probabilities_class0 += np.log(hypothesis_ratios[0])
         probabilities_class1 += np.log(hypothesis_ratios[1])
@@ -149,7 +158,8 @@ def class_probabilites(data, variance_table_class0, variance_table_class1, hypot
     return probabilities
 
 # calculate the class probabilities for the training data
-probabilities = class_probabilites(training_data, variance_table_class0, variance_table_class1, hypothesis_ratios)
+probabilities = class_probabilites(training_data, variance_table_class0, variance_table_class1, \
+                                   hypothesis_ratios)
 print()
 print("Training_data class probabilities")
 print("class 0", "      class 1")
@@ -159,14 +169,16 @@ print()
 
   
 # calculate the class probabilities for the test data
-probabilities = class_probabilites(test_data, variance_table_class0, variance_table_class1, hypothesis_ratios)
+probabilities = class_probabilites(test_data, variance_table_class0, variance_table_class1, \
+                                   hypothesis_ratios)
 print("Test_data class probabilities")
 [print("class 0", "            class 1")]
 for i in range(10):
     print(f"{probabilities[i][0]:10.4f} {' ' * 6} {probabilities[i][1]:10.4f}")
 print()
 
-# calculate the accuracy, precision, and recall of the model on the test_dataand the test_targets
+# calculate the accuracy, precision, and recall of the model on the test_data \
+# and the test_targets
 def accuracy_precision_recall(test_targets, probabilities):
     # initialize the accuracy, precision, and recall
     accuracy = 0
