@@ -6,6 +6,12 @@ see the assignment description in the README.md file
 import numpy as np
 import pandas as pd
 
+print("Gaussian Naive Bayes Algorithm")
+print ("Machine Language Programming assignment 2")
+print("Author: Larry Bilodeau")
+print()
+print()
+
 # define a function to process the feature labels.
 def read_and_truncate_file(file_path):
     feature_labels = []
@@ -16,10 +22,11 @@ def read_and_truncate_file(file_path):
     return feature_labels
 
 # Load the raw data
-rawdata = pd.read_csv('datasets\spambase.data', header=None)
+rawdata = pd.read_csv('..\datasets\spambase.data', header=None)
+print("Data set: spambase.data")
 print("rawdata shape", rawdata.shape)
 # load the feature labels for the rawdata
-feature_labels = read_and_truncate_file('datasets\\feature_labels.txt')
+feature_labels = read_and_truncate_file('..\\datasets\\feature_labels.txt')
 
 #
 # step 1: split the data into training and testing sets
@@ -59,10 +66,11 @@ hypothesis_ratios = frequencies / len(test_targets)
 # P(H) = P(D|H) * P(H) / P(D)
 
 for h, f, r in zip(hypotheses, frequencies, hypothesis_ratios):
+    print()
     print(f"{'Hypothesis':<15} {'Frequency':<15} {'Ratio':<15}")
     print(f"{h:<15} {f:<15} {r:<15.2f}")
     print()
-    print("prior probability of each hypothesis")
+    print("Prior Probability of each hypothesis")
     print("hyposis: spam,  P(h1):", hypothesis_ratios[1])
     print("hyposis: not spam,  P(h0):", hypothesis_ratios[0])
     print(" P(+|h1):", 1 - hypothesis_ratios[1], "P(-|h1):", hypothesis_ratios[1])
@@ -76,9 +84,9 @@ grouped_data = training_data.groupby(training_targets)
 for clas, group in grouped_data:
     mean = group.mean()
     std_dev = group.std()
-    print(f"\nGroup for target = {clas}")
-    for col in range(len(mean)):
-        print(f"Column {col:<10} Mean: {mean[col]:<15.4f} Standard Deviation: {std_dev[col]:<15.4f}")
+    #print(f"\nGroup for target = {clas}")
+    #for col in range(len(mean)):
+    #    print(f"Column {col:<10} Mean: {mean[col]:<15.4f} Standard Deviation: {std_dev[col]:<15.4f}")
 
 # probalistic Model
 # build the variance table from the means for each column and the column variance,
@@ -88,20 +96,21 @@ variance_table_data = []
 for clas, group in grouped_data:
     mean = group.mean()
     std_dev = group.std()
-    std_dev[std_dev == 0] = 0.0001
-    variance = std_dev ** 2        
+    std_dev[std_dev == 0.0000] = 0.0001
+    variance = std_dev ** 2
+    variance[variance == 0.0000] = 0.0001        
     for i, feature_label in enumerate(feature_labels):
-        print("class: ", clas, "  feature:", feature_label, "  mean:", mean[i], "  std_dev:", std_dev[i], "  variance:", variance[i])
+        print(f"class: {clas:<10} feature: {feature_label:<30} mean: {mean[i]:<10.4f} std_dev: {std_dev[i]:<10.4f} \
+               variance: {variance[i]:<10.4f}")
         variance_table_data.append({'Class': clas, 'Feature': feature_label, 'Mean': mean[i], 'Standard Deviation': std_dev[i],\
                                      'Variance': variance[i]})
 variance_table = pd.DataFrame(variance_table_data)
 variance_table_class0 = variance_table[variance_table['Class'] == 0]
 variance_table_class1 = variance_table[variance_table['Class'] == 1]
 
-print(np.shape(variance_table)    )
+#print(np.shape(variance_table)    )
 
 print("\nVariance Table")
-print()
 print(f"{'                                     class 0':37}{'                         class 1':<25}")
 print(f"{'Feature':<30} {'Spam_mean':<10} {'Spam_variance':<15} {'Not Spam_mean':<13} {'Not Spam_variance':<16}")
 row_size = training_data.shape[1] -1
@@ -117,7 +126,9 @@ print()
 #calculatethe gaussian probability density function
 
 def gaussian_pdf(x, mean, variance):
-    return (1 / np.sqrt(2 * np.pi * variance)) * np.exp(-((x - mean) ** 2) / (2 * variance))    
+    if variance == 0:
+        variance = 0.0001
+    return (1 / np.sqrt(2 * np.pi * variance)) * np.exp(-((x - mean) ** 2) / (2 * variance))
 
 def class_probabilites(data, variance_table_class0, variance_table_class1, hypothesis_ratios):
     # initialize the probabilities
@@ -139,20 +150,21 @@ def class_probabilites(data, variance_table_class0, variance_table_class1, hypot
 
 # calculate the class probabilities for the training data
 probabilities = class_probabilites(training_data, variance_table_class0, variance_table_class1, hypothesis_ratios)
-
+print()
 print("Training_data class probabilities")
-print("class 0", "class 1")
+print("class 0", "      class 1")
 for i in range(10):
-    print(probabilities[i]) 
+    print(f"{probabilities[i][0]:10.4f} {probabilities[i][1]:10.4f}")
 print()
 
   
 # calculate the class probabilities for the test data
 probabilities = class_probabilites(test_data, variance_table_class0, variance_table_class1, hypothesis_ratios)
 print("Test_data class probabilities")
-print("class 0", "class 1")
+[print("class 0", "            class 1")]
 for i in range(10):
-    print(probabilities[i])
+    print(f"{probabilities[i][0]:10.4f} {' ' * 6} {probabilities[i][1]:10.4f}")
+print()
 
 # calculate the accuracy, precision, and recall of the model on the test_dataand the test_targets
 def accuracy_precision_recall(test_targets, probabilities):
@@ -176,8 +188,9 @@ def accuracy_precision_recall(test_targets, probabilities):
     return accuracy, precision, recall  
 
 print()
-print("Accuracy, Precision, Recall")
-print(accuracy_precision_recall(test_targets, probabilities))
+print("Accuracy    Precision   Recall")
+accuracy, precision, recall = accuracy_precision_recall(test_targets, probabilities)
+print(f"{accuracy:.4f}     {precision:.4f}     {recall:.4f}")
 print()  
 
 # generate a confusion matrix for the test data given the test_targets
