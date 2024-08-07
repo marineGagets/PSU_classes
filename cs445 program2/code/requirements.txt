@@ -1,0 +1,11 @@
+# packages used for this exercise
+numpy == 1.19.5
+mathlab == 1.0.0
+sys == 1.0.0
+os == 1.0.0
+
+
+
+
+
+
