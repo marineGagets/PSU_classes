@@ -1,0 +1,14 @@
+{
+    "cSpell.dictionaries": [
+        "!md"
+    ],
+    "cSpell.flagWords": [
+        "word->suggestion, suggestions"
+    ],
+    "cSpell.spellCheckOnlyWorkspaceFiles": true,
+    "cSpell.ignoreRegExpList": [
+        "/\\\\[a-z]+/gi",
+        "/\\b[A-Z]{3,5}\\b/g",
+        "CStyleComment"
+    ]
+}
