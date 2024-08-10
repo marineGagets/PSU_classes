@@ -1,10 +1,9 @@
 librosa
-csv
 keras
 pandas
 numpy
 matplotlib
-sklearn
+scikit-learn
 IPython
 tensorflow
 
