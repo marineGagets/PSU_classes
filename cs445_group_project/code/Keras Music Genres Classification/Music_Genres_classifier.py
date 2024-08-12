@@ -71,6 +71,7 @@ data.head()
 genre_list = data.iloc[:, -1]
 encoder = LabelEncoder()
 y = encoder.fit_transform(genre_list)
+print("y:",y, "encoder:", encoder, "genre_list:", genre_list)
 
 # normalizing the dataset
 scaler = StandardScaler()
