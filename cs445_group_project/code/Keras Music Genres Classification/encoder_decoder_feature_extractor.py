@@ -14,19 +14,20 @@ import numpy as np
 import os
 import csv
 import sys
-from keras.models import Model
-from keras.layers import Input, LSTM, Dense
+import sklearn
+
+# note: to import keras, install only tensorflow and not keras
+os.environ["KERAS_BACKEND"] = "tensorflow"
+from tensorflow import keras
+from keras import layers, models
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
 
-landing_path = 'PSU_classes/cs445_group_project/code/Keras Music Genres Classification/generated_data_sets'
+landing_path = 'generated_data_sets/'
 data_source_path = "d:/workspace/data_sets/Kaggle GTZAND audio Data/genres_original"
 genres = 'blues classical country disco hiphop jazz metal pop reggae rock'.split()
-
-Dataset = create_raw_dataset(data_source_path, genres)
-
 
 
 # Step 1 - load audio files (wav) and convert to mel spectrograms
@@ -48,64 +49,49 @@ def create_raw_dataset(data_source_path, genres):
     # walk through the folders of the GTZAND audio files by genres
     # create a dataset of the mel spectrograms and the genre of the file
 
-    filepath = os.listdir(f'{data_source_path}')
     S_dB_dataset = [] # create an empty dataset
     for g in genres:
         for filename in os.listdir(f'{data_source_path}/{g}'):
-            filename = f'{data_source_path}/{g}/{filename}'
-            S_dB = compute_mel_spectrogram(filename) # convert the file to a mel spectrogram in db
+            filename_path = f'{data_source_path}/{g}/{filename}'
+            S_dB = compute_mel_spectrogram(filename_path) # convert the file to a mel spectrogram in db
+            #filename = filename_path.split('/')[-1] # get the last node of the filename_path
             S_dB_dataset.append((filename, S_dB, g)) # add the spectrogram and genre to the dataset
         # since this may take a while, save the dataset to a file in csv format
         file = open(f'{landing_path}/generated_feature_set.csv', 'a', newline='')
         with file:
             writer = csv.writer(file)
-            writer.writerow(S_dB_dataset.split())
+            writer.writerow(S_dB_dataset)
+    # trim the dataset to make it homogeneous
+    #min_length = min(len(item[1]) for item in S_dB_dataset)
+    #S_dB_dataset = [(item[0], item[1][:min_length], item[2]) for item in S_dB_dataset]
+    # convert the dataset to a numpy array
+    S_dB_dataset = np.array(S_dB_dataset, dtype=object)
+    #S_dB_dataset = np.array([list(item) for item in S_dB_dataset])
+
     return S_dB_dataset
 
-#  create and store a file copy of the dataset in csv format
-
-if len(sys.args) == 1:
-    print("creating the dataset ")
-    S_dB_dataset = create_raw_dataset(data_source_path, genres)
-    print("No command line parameters set, processing the GTZAND audio files")
-elif 'S_dB_dataset' not in locals() or S_dB_dataset is None or len(S_dB_dataset) == 0:
-    print("No dataset found")
-    print("program terminated")
-    sys.exit(1)
 
 # Step 3 - create an encoder-decoder model to extract features from the dataset
-
-# set up some parameters for the model
-number_columns = len(S_dB_dataset[3])
-number_inputs = len(S_dB_dataset)
-num_encoder_features = number_columns
-num_decoder_features = 26
-encoder_states = []
-decoder_outputs = []
 
 # define the steps as functions
 
 def preprocess_dataset(dataset):
     # preprocess the dataset by scaling and normalize the data
     scaler = StandardScaler()
-    X = scaler.fit_transform(np.array(dataset.iloc[:, :-1], dtype=float))
-    genre_list = dataset.iloc[:, -1]
+    # trim the dataset to have all vector to have the same shape
+    # find the minimum length of the spectrogram
+    
+    # normalizing the dataset
+    X = scaler.fit_transform(dataset[:, 1].astype(float)) #TODO: check if this is the right way to normalize the data
+    genre_list = dataset[:, -1]
     encoder = LabelEncoder()
     y = encoder.fit_transform(genre_list)
-    # preprocess the dataset
-    X, y = preprocess_dataset(S_dB_dataset)
-    genre_list = S_dB_dataset.iloc[:, -1]
 
-    encoder = LabelEncoder()
-    y = encoder.fit_transform(genre_list)
     print("y:", y,)
     print("encoder:", encoder, "genre_list:", genre_list)
 
-    # normalizing the dataset
-    scaler = StandardScaler()
-    X = scaler.fit_transform(np.array(S_dB_dataset.iloc[:, :-1], dtype=float))
-
     #  Step 4 Splitting the dataset into training and testing sets (20% of data for testing)
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     print(np.shape(X_train), np.shape(X_test), np.shape(y_train), np.shape(y_test))
     return X_train, X_test, y_train, y_test
@@ -136,7 +122,7 @@ def define_encoder_decoder_model(num_encoder_features, num_decoder_features):
 
     return model
 
-class FileLogger(tf.keras.callbacks.Callback):
+class FileLogger(keras.callbacks.Callback):
     def __init__(self, filename):
         super(FileLogger, self).__init__()
         self.filename = filename
@@ -160,10 +146,36 @@ def train_encoder_decoder_model(model, X_train, y_train, X_test, y_test):
 # main program
 
 # read files and process into a from the wav files into mel spectrograms
-Dataset = create_raw_dataset(data_source_path, genres)
+if len(sys.argv) >= 2:
+    data_source_path = sys.argv[1]
+    print("Building raw dataset from the command line parameter for folders of audio files")
+if len(sys.argv) >= 2:
+    if len(sys.argv[3]) < 1:
+        print("No command line parameter for genres, will use default genres list")
+        genres = genres
+    elif len(sys.argv[3]) >= 3:   
+        genres = sys.argv[2].split()
+        print("Building raw dataset from the command line parameter for folders of audio files")
+    else:
+        print("Creating the dataset from folders of GTZAND audio files")
+        genres = genres
+S_dB_dataset = create_raw_dataset(data_source_path, genres)
+if S_dB_dataset is None:
+    print("No dataset created, end program.")
+    exit()
+
+
+
 # preprocess the dataset and split into training and testing sets
-X_train, X_test, y_train, y_test = preprocess_dataset(Dataset)
+X_train, X_test, y_train, y_test = preprocess_dataset(S_dB_dataset)
 # define the encoder-decoder model
+# set up some parameters for the model
+number_columns = len(S_dB_dataset[3])
+number_inputs = len(S_dB_dataset)
+num_encoder_features = number_columns
+num_decoder_features = 26
+encoder_states = []
+decoder_outputs = []
 en_decoder_model = define_encoder_decoder_model(
                             num_encoder_features,
                             num_decoder_features)
@@ -193,10 +205,12 @@ print(np.argmax(predictions[0]))
 
 
 
-# Loading Keras
-os.environ["KERAS_BACKEND"] = "tensorflow"
-from tensorflow import keras
-from keras import layers, models
+
+
+
+
+
+
 
 # Creating the model
 model = models.Sequential()
