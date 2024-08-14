@@ -15,14 +15,17 @@ import os
 import csv
 import sys
 import sklearn
+import pandas as pd
 
 # note: to import keras, install only tensorflow and not keras
 os.environ["KERAS_BACKEND"] = "tensorflow"
+import tensorflow as tf
 from tensorflow import keras
-from keras import layers, models
+from keras import layers, models, Model
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from keras.layers import LSTM, Dense, Input
 
 
 landing_path = 'generated_data_sets/'
@@ -76,21 +79,29 @@ def create_raw_dataset(data_source_path, genres):
 # define the steps as functions
 
 def preprocess_dataset(dataset):
-    # preprocess the dataset by scaling and normalize the data
-    scaler = StandardScaler()
-    # trim the dataset to have all vector to have the same shape
-    # find the minimum length of the spectrogram
-    
-    # normalizing the dataset
-    X = scaler.fit_transform(dataset[:, 1].astype(float)) #TODO: check if this is the right way to normalize the data
+    # preprocess the dataset by scaling and normalizing the data
     genre_list = dataset[:, -1]
+    # drop the filename and the genres from the dataset
+    data = np.array(dataset[:, 1:-1])
+    # detrermine the mean for each column except the first (filename) and the last (genres)
+    # and subtract the mean from each column
+    mean = np.mean(data[:, 1:-1], axis=0)
+    data[:, 1:-1] -= mean
+    # determine the max for each column except the first (filename) and the last (genres)
+    # and divide each value in the respective column
+    max = np.max(data[:, 1:-1], axis=0)
+    data[:, 1:-1] /= max
+    X = data
+
+   # dataset_df = pd.DataFrame(dataset[:, 1:-1])
+   # scaled_features = pd.DataFrame(scaler.fit_transform(dataset_df), columns=dataset_df.columns)
+   # X = scaled_features
+    #genre_list = dataset[:, -1]
     encoder = LabelEncoder()
     y = encoder.fit_transform(genre_list)
 
-    print("y:", y,)
+    print("y:", y)
     print("encoder:", encoder, "genre_list:", genre_list)
-
-    #  Step 4 Splitting the dataset into training and testing sets (20% of data for testing)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     print(np.shape(X_train), np.shape(X_test), np.shape(y_train), np.shape(y_test))
@@ -99,13 +110,13 @@ def preprocess_dataset(dataset):
 
 def define_encoder_decoder_model(num_encoder_features, num_decoder_features):
     # Define the encoder
-    encoder_inputs = S_dB_dataset(shape=(None, num_encoder_features))
+    encoder_inputs = layers.Input(shape=(None, num_encoder_features))
     encoder_lstm = LSTM(256, return_state=True)
     encoder_outputs, state_h, state_c = encoder_lstm(encoder_inputs)
     encoder_states = [state_h, state_c]
 
     # Define the decoder
-    decoder_inputs = S_dB_dataset(shape=(None, num_decoder_features))
+    decoder_inputs = layers.Input(shape=(None, num_decoder_features))
     decoder_lstm = LSTM(256, return_sequences=True, return_state=True)
     decoder_outputs, _, _ = decoder_lstm(decoder_inputs, initial_state=encoder_states)
     decoder_dense = Dense(num_decoder_features, activation='softmax')
@@ -114,7 +125,7 @@ def define_encoder_decoder_model(num_encoder_features, num_decoder_features):
     # Define the model that will turn encoder_inputs and decoder_inputs into decoder_outputs
     model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
 
-    # Compile the model
+    # Compile the model, of note the adam optimizer uses gradient descent each layer is full connected to the next
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     # Summary of the model
@@ -132,13 +143,30 @@ class FileLogger(keras.callbacks.Callback):
             f.write(f"Epoch {epoch + 1}: {logs}\n")
 
 def train_encoder_decoder_model(model, X_train, y_train, X_test, y_test):
+    """
+    Trains an encoder-decoder model using the provided data.
+
+    Args:
+        model: The encoder-decoder model to train.
+        X_train: The input training data.
+        y_train: The target training data.
+        X_test: The input test data.
+        y_test: The target test data.
+
+    Returns:
+        The trained encoder-decoder model.
+    """
+    print("shapes: X_train:", np.shape(X_train)," y_train: ", np.shape(y_train)," X_test: ", np.shape(X_test)," y_test: ", np.shape(y_test))
     # Train the model
     # append to a file the training log for each epoch
     file_logger = FileLogger('training.log')
-    model.fit([X_train, y_train], y_train,
+    y_train_T = tf.convert_to_tensor(np.array([y_train]).T)
+    y_test_T = tf.convert_to_tensor(np.array([y_test]).T)
+    #x_train = tf.convert_to_tensor(X_train)
+    model.fit(X_train, y_train_T,
               batch_size=128,
               epochs=100,
-              validation_data=([X_test, y_test], y_test),
+              validation_data=(X_test, y_test_T),
               callbacks=[file_logger])
     return model
 
@@ -168,10 +196,15 @@ if S_dB_dataset is None:
 
 # preprocess the dataset and split into training and testing sets
 X_train, X_test, y_train, y_test = preprocess_dataset(S_dB_dataset)
+print()
+print("S_db_dataset shape: ", np.shape(S_dB_dataset), " X_train:", np.shape(X_train[788][0]), "X_test:", np.shape(X_test[1][0]), "y_train:", np.shape(y_train), "y_test:", np.shape(y_test))
 # define the encoder-decoder model
 # set up some parameters for the model
-number_columns = len(S_dB_dataset[3])
-number_inputs = len(S_dB_dataset)
+print(S_dB_dataset[0],"shape:", np.shape(S_dB_dataset[0]), "shape:", np.shape(S_dB_dataset[0][1]))
+print(S_dB_dataset[1],"shape:", np.shape(S_dB_dataset[1]), "shape:", np.shape(S_dB_dataset[1][1]))
+number_columns = len(S_dB_dataset[0][1][0])
+number_inputs = len(S_dB_dataset[0][1])
+print(S_dB_dataset[0][1])
 num_encoder_features = number_columns
 num_decoder_features = 26
 encoder_states = []
@@ -181,6 +214,8 @@ en_decoder_model = define_encoder_decoder_model(
                             num_decoder_features)
 # train the model and save the model's epoch data to a file
 en_decoder_model = train_encoder_decoder_model(en_decoder_model, X_train, y_train, X_test, y_test)
+# save trained encode-decoder model.
+en_decoder_model.save('encoder_decoder_model.h5')
 # Save the encoder model for future use.
 encoder_model = Model(en_decoder_model.input[0], en_decoder_model.layers[2].output)
 encoder_model.save('encoder_model.h5')
