@@ -25,6 +25,7 @@ from keras import layers, models, Model
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
 from keras.layers import LSTM, Dense, Input
 
 
@@ -48,28 +49,34 @@ def compute_mel_spectrogram(file_path):
 # we need to walk down through the folders to read each file by its genres folder,
 # convert the file to a specrogram and create a dataset of the spectrogram and the genre
 
-def create_raw_dataset(data_source_path, genres):
+def create_preprocessed_dataset(data_source_path, genres):
     # walk through the folders of the GTZAND audio files by genres
     # create a dataset of the mel spectrograms and the genre of the file
+    # normalize the spectrogram and scale the columns
+    # perform PCA on the spectrogram to reduce the dimensions to a list
 
     S_dB_dataset = [] # create an empty dataset
     for g in genres:
         for filename in os.listdir(f'{data_source_path}/{g}'):
             filename_path = f'{data_source_path}/{g}/{filename}'
             S_dB = compute_mel_spectrogram(filename_path) # convert the file to a mel spectrogram in db
-            #filename = filename_path.split('/')[-1] # get the last node of the filename_path
-            S_dB_dataset.append((filename, S_dB, g)) # add the spectrogram and genre to the dataset
+            # normalize the spectrogram
+            S_dB = sklearn.preprocessing.normalize(S_dB)
+            # scale the spectrogram columns
+            scaler = StandardScaler()
+            S_dB = scaler.fit_transform(S_dB)
+            # Perform PCA on the spectrgram to reduce the dimensions to a list
+            pca = sklearn.decomposition.PCA(n_components=1)
+            pca_result = pca.fit_transform(S_dB)
+            pca_result = pca_result.astype(np.float64)
+            pca_result_list = pca_result.flatten().astype(np.float64)
+            filename = filename_path.split('/')[-1] # get the last node of the filename_path
+            S_dB_dataset.append((filename, pca_result_list, g)) # add the spectrogram and genre to the dataset
         # since this may take a while, save the dataset to a file in csv format
-        file = open(f'{landing_path}/generated_feature_set.csv', 'a', newline='')
+        file = open(f'{landing_path}/generated_feature_set_spectro.csv', 'a', newline='')
         with file:
             writer = csv.writer(file)
-            writer.writerow(S_dB_dataset)
-    # trim the dataset to make it homogeneous
-    #min_length = min(len(item[1]) for item in S_dB_dataset)
-    #S_dB_dataset = [(item[0], item[1][:min_length], item[2]) for item in S_dB_dataset]
-    # convert the dataset to a numpy array
-    S_dB_dataset = np.array(S_dB_dataset, dtype=object)
-    #S_dB_dataset = np.array([list(item) for item in S_dB_dataset])
+            writer.writerow(S_dB_dataset)    
 
     return S_dB_dataset
 
@@ -80,29 +87,20 @@ def create_raw_dataset(data_source_path, genres):
 
 def preprocess_dataset(dataset):
     # preprocess the dataset by scaling and normalizing the data
-    genre_list = dataset[:, -1]
+    genre_list = [row[2] for row in dataset]
     # drop the filename and the genres from the dataset
-    data = np.array(dataset[:, 1:-1])
-    # detrermine the mean for each column except the first (filename) and the last (genres)
-    # and subtract the mean from each column
-    mean = np.mean(data[:, 1:-1], axis=0)
-    data[:, 1:-1] -= mean
-    # determine the max for each column except the first (filename) and the last (genres)
-    # and divide each value in the respective column
-    max = np.max(data[:, 1:-1], axis=0)
-    data[:, 1:-1] /= max
-    X = data
+    X = np.array([row[1] for row in dataset])
+    # Scale and normalize the data
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
 
-   # dataset_df = pd.DataFrame(dataset[:, 1:-1])
-   # scaled_features = pd.DataFrame(scaler.fit_transform(dataset_df), columns=dataset_df.columns)
-   # X = scaled_features
-    #genre_list = dataset[:, -1]
+    # Print the first 5 rows of X
+    print(X[:5])
+    # encode the genres labels to integers
     encoder = LabelEncoder()
     y = encoder.fit_transform(genre_list)
-
-    print("y:", y)
-    print("encoder:", encoder, "genre_list:", genre_list)
-
+    print("y:", np.unique(y), "  genres: ", np.unique(genre_list))
+    # split the dataset into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     print(np.shape(X_train), np.shape(X_test), np.shape(y_train), np.shape(y_test))
     return X_train, X_test, y_train, y_test
@@ -187,7 +185,7 @@ if len(sys.argv) >= 2:
     else:
         print("Creating the dataset from folders of GTZAND audio files")
         genres = genres
-S_dB_dataset = create_raw_dataset(data_source_path, genres)
+S_dB_dataset = create_preprocessed_dataset(data_source_path, genres)
 if S_dB_dataset is None:
     print("No dataset created, end program.")
     exit()
@@ -197,14 +195,13 @@ if S_dB_dataset is None:
 # preprocess the dataset and split into training and testing sets
 X_train, X_test, y_train, y_test = preprocess_dataset(S_dB_dataset)
 print()
-print("S_db_dataset shape: ", np.shape(S_dB_dataset), " X_train:", np.shape(X_train[788][0]), "X_test:", np.shape(X_test[1][0]), "y_train:", np.shape(y_train), "y_test:", np.shape(y_test))
+print( " X_train:", np.shape(X_train), "X_test:", np.shape(X_test), "y_train:", np.shape(y_train), "y_test:", np.shape(y_test))
 # define the encoder-decoder model
 # set up some parameters for the model
-print(S_dB_dataset[0],"shape:", np.shape(S_dB_dataset[0]), "shape:", np.shape(S_dB_dataset[0][1]))
-print(S_dB_dataset[1],"shape:", np.shape(S_dB_dataset[1]), "shape:", np.shape(S_dB_dataset[1][1]))
-number_columns = len(S_dB_dataset[0][1][0])
-number_inputs = len(S_dB_dataset[0][1])
-print(S_dB_dataset[0][1])
+#print(S_dB_dataset[0],"shape:", np.shape(S_dB_dataset[0]), "shape:", np.shape(S_dB_dataset[0][1]))
+#print(S_dB_dataset[1],"shape:", np.shape(S_dB_dataset[1]), "shape:", np.shape(S_dB_dataset[1][1]))
+number_columns = np.shape(X_train)[1]
+number_inputs = np.shape(X_train)[0]
 num_encoder_features = number_columns
 num_decoder_features = 26
 encoder_states = []
