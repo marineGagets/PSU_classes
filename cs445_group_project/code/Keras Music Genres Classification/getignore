@@ -9,6 +9,7 @@ __pycache__/
 *.pyz/
 *.pyw/
 *.egg-info/
+*.zip
 dist/
 build/
 *.egg
